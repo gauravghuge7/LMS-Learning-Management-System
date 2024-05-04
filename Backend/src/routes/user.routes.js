@@ -10,7 +10,9 @@ import {
     logoutUser,
     getUser,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    changePassword,
+    updateUser
 
 
 } from "../controllers/user.controller.js";
@@ -25,6 +27,8 @@ userRouter.get('/getUser', isLoggedIn, getUser);
 userRouter.post('/forgotPassword', forgotPassword);
 userRouter.post('/resetPassword', resetPassword);
 
+userRouter.put('/changePassword', isLoggedIn, changePassword)
+userRouter.post('/updateUser', isLoggedIn, updateUser);
 
 export {
     userRouter

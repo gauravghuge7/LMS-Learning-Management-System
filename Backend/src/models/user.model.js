@@ -41,9 +41,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         
     },
+
     forgotPasswordExpires: {
         type: Date,
     },
+    
     role: {
         type: String,
         enum: ['USER', 'ADMIN', 'SUPERADMIN'],

@@ -10,6 +10,7 @@ import sendEmail from '../utils/sendEmail.js';
 
 
 
+
 const cookieOptions = {
     httpOnly: true,
     maxAge: process.env.JWT_EXPIRES,
@@ -127,8 +128,11 @@ const loginUser = async (req, res) => {
         }
     
         const user = await User.findOne({email}).select('+password');
+
         if (!user) {
-            throw new ApiError(401, "user not found");
+            res.status(400).json(
+                new ApiError(401, "user not found")
+            )    
         }
     
         const isValid = await bcrypt.compare(password, user.password)
@@ -196,7 +200,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     const user = await User.findOne({email});
 
     if (!user) {
-        throw new ApiError(404, "user not found");
+        throw new ApiError(404, "user is not registered ");
     }
 
     const resetToken = user.generatePasswordResetToken();
@@ -216,7 +220,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
 
         res.status(200).json(
-            new ApiResponse(200, `password reset email ${email} sent successfully`)
+            new ApiResponse(200, `password reset email to ${email} sent successfully`)
         )
 
     } 
@@ -224,6 +228,8 @@ const forgotPassword = asyncHandler(async (req, res) => {
         user.forgotPasswordExpires = null;
         user.forgotPasswordToken = null;
         await user.save();
+
+
         console.log(error);
         throw new ApiError(500, "server error", error);
         
@@ -233,11 +239,20 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
 const resetPassword = asyncHandler(async (req, res) => {
 
-    const {token, password} = req.body;
+    
+    const {resetToken} = req.params;
 
-    if (!token || !password) {
+    const {password} = req.body;
+
+    const forgotPasswordToken = crypto.createHash
+        
+
+    if (!resetToken || !password) {
         throw new ApiError(400, "token and password must be required");
     }
+
+
+
 
     
 
@@ -246,11 +261,108 @@ const resetPassword = asyncHandler(async (req, res) => {
     )
 })
 
+
+const changePassword = asyncHandler(async (req,res) => {
+
+    const {oldPassword, newPassword} = req.body;
+
+    const {id} = req.user;
+
+    if(!oldPassword || !newPassword) {
+        throw new ApiError(400, "old password and new password are required");
+    }
+
+    const user = await User.findById(id)
+    .select('+password')
+
+    if(!user) {
+        throw new ApiError(400, " user doesnot exist in data base");
+    }
+
+    const isPasswordValid = await user.comparePassword(oldPassword);
+    if(!isPasswordValid) {
+        throw new ApiError(400, "old password does not match to the password");
+    }
+
+    user.password = password;
+
+    user.password = undefined
+    await user.save();
+
+    res.status(200)
+    .json(
+        new ApiResponse(200, "password changed succefully ")
+    )
+})
+
+const updateUser = asyncHandler(async (req, res) => {
+
+    const {id} = req.user.id;
+
+    const {fullName} = req.body;
+
+    const user = await User.findById(id);
+
+    if(req.fullName) {
+        user.fullName = fullName;
+
+    }
+
+    if(req.file) {
+        console.log(req.file);
+        try {
+
+            const result = await cloudinary.v2.uploader.upload(req.file.path, {
+
+                folder: 'uploads',  // Save files in a folder named lms
+                width: 250,
+                height: 250,
+                gravity: 'faces', // This option tells cloudinary to center the image around detected faces (if any) after cropping or resizing the original image
+                crop: 'fill',
+            });
+
+            
+
+            if(result) {
+
+                // Set the public_id and secure_url in DB
+                user.avatar.public_id = result.public_id;
+                user.avatar.secure_url = result.secure_url;
+
+        
+
+                // After successful upload remove the file from local storage
+                fs.rm(`uploads/${req.file.filename}`);
+            }
+
+            
+
+        }
+
+        catch (error) {
+        
+            new ApiError(error)
+            console.log("error in uploading avatar", error);
+        
+        }
+    }
+
+    await user.save();
+
+    return res.status(200)
+    .json(
+        new ApiResponse(200, "user update successfully ", user)
+    )
+
+})
+
 export {
     registerUser,
     loginUser,
     logoutUser,
     getUser,
     forgotPassword, 
-    resetPassword
+    resetPassword,
+    changePassword,
+    updateUser
 }
